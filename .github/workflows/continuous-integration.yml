@@ -14,12 +14,12 @@ name: "Continuous Integration"
 #
 # A ruleset can only require a workflow that lives in the SAME organization as
 # the repository it governs, so webinertia/.github cannot serve this
-# organization and a copy is kept here instead. The two are independent copies:
-# changing upstream does not reach this file, so a change to either must be
-# carried to the other by hand. Identical from `on:` down, filename included,
-# EXCEPT the Markdown job, which this copy omits. That job fails when
-# markdownlint-cli2.jsonc is absent from a target repository's root, and neither
-# common-doc repository carries the file yet. Add the job here when they do.
+# organization and an identical file is kept here instead. The two are
+# independent copies: changing upstream does not reach this file, so a change
+# to either must be carried to the other by hand. Deliberately identical from
+# `on:` down, filename included, so the check name matches in both
+# organizations. Both common-doc repositories now carry markdownlint-cli2.jsonc,
+# so the Markdown job is present here again.
 #
 # GitHub triggers this file itself, so per-repository variation cannot arrive
 # as `with:` inputs the way it does for a consumer's `uses:` call. It is read
@@ -190,6 +190,29 @@ jobs:
           done < <(find . -name mago.toml -not -path './vendor/*' -not -path './.git/*')
 
           exit "$failed"
+
+  markdown:
+    name: "Markdown"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # The config lives in the package root, copied from the webware-alignment
+      # preset. Defaults are unusable: line length and table alignment alone
+      # produce hundreds of findings on documents that render perfectly.
+      - name: Require the lint config
+        run: |
+          if [ ! -f markdownlint-cli2.jsonc ]; then
+            echo "::error::markdownlint-cli2.jsonc is missing. Copy presets/webware-alignment/artifacts/markdownlint-cli2.jsonc from webware-tools into the repository root."
+            exit 1
+          fi
+
+      # Pinned so a rule change cannot red the fleet on its own.
+      - name: Lint Markdown
+        run: npx --yes markdownlint-cli2@0.24.2 --config markdownlint-cli2.jsonc
 
   mago:
     name: "Mago (PHP ${{ matrix.php }})"
